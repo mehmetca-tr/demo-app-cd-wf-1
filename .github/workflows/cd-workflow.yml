@@ -38,6 +38,10 @@ jobs:
         while read line; do
           echo "$line" >> $GITHUB_ENV
         done < main/${{ env.ENV_FILE }}
+    
+    - name: Use the env var
+      run: |
+        echo "${{ env.RESOURCE_GROUP }}"
 
     - name: "Set the target AKS cluster"
       uses: Azure/aks-set-context@v1
