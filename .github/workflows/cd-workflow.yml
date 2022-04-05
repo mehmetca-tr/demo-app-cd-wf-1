@@ -3,28 +3,7 @@ name: CD-Workflow
 on:
   workflow_call:
     inputs:
-      CLUSTER_NAME:
-        required: true
-        type: string
-      RESOURCE_GROUP:
-        required: true
-        type: string
-      NAMESPACE:
-        required: true
-        type: string
-      IMAGE_NAME:
-        required: true
-        type: string
-      HELM_RELEASE_NAME:
-        required: true
-        type: string
-      HELM_CHART_PATH:
-        required: true
-        type: string
-      APP_VERSION:
-        required: true
-        type: string
-      HELM_CHART_VERSION:
+      ENV_FILE:
         required: true
         type: string
     secrets:
@@ -36,29 +15,37 @@ on:
         required: true
       AZURE_CREDENTIALS:
         required: true
-# jobs:
-#   example_job:
-#     name: Pass input and secrets to my-action
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: ./.github/workflows/my-action
-#         with:
-#           username: ${{ inputs.username }}
-#           token: ${{ secrets.token }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: "Get code from github repo"
-      uses: actions/checkout@master
+    - name: "Checkout service repository"
+      uses: actions/checkout@v3
+      with:
+        path: main
+
+    - name: "Checkout services-helm-charts repository"
+      uses: actions/checkout@v3
+      with:
+        repository: mehmetca-tr/services-helm-charts
+        path: services-helm-charts
+
+    - name: Import environment configuration variables maps file
+      id: import-env
+      shell: bash
+      run: |
+        while read line; do
+          echo "$line" >> $GITHUB_ENV
+        done < main/${{ env.ENV_FILE }}
 
     - name: "Set the target AKS cluster"
       uses: Azure/aks-set-context@v1
       with:
         creds: '${{ secrets.AZURE_CREDENTIALS }}'
-        cluster-name: ${{ inputs.CLUSTER_NAME }}
-        resource-group: ${{ inputs.RESOURCE_GROUP }}
+        cluster-name: ${{ env.CLUSTER_NAME }}
+        resource-group: ${{ env.RESOURCE_GROUP }}
+
 
     ### HELM COMMANDS
 
@@ -73,14 +60,14 @@ jobs:
             --dry-run \
             --install \
             --create-namespace \
-            --namespace ${{ inputs.NAMESPACE }} \
+            --namespace ${{ env.NAMESPACE }} \
             --atomic \
             --wait \
-            ${{ inputs.HELM_RELEASE_NAME }} \
-            ${{ inputs.HELM_CHART_PATH }} \
-            --set namespace=${{ inputs.NAMESPACE }} \
+            ${{ env.HELM_RELEASE_NAME }} \
+            ${{ env.HELM_CHART_PATH }} \
+            --set namespace=${{ env.NAMESPACE }} \
             --set image.repository=${{ secrets.ACR_URL }} \
-            --set image.name=${{ inputs.IMAGE_NAME }} \
+            --set image.name=${{ env.IMAGE_NAME }} \
             --set image.tag=${{ github.sha }}
             ### "--SET" should be replaced with "-f values.yaml" format
 
@@ -88,9 +75,9 @@ jobs:
       run: |
         helm package \
             --dependency-update \
-            --app-version ${{ inputs.APP_VERSION }} \
-            --version ${{ inputs.HELM_CHART_VERSION }} \
-            ${{ inputs.HELM_CHART_PATH }}
+            --app-version ${{ env.APP_VERSION }}-${{ github.sha }} \
+            --version ${{ env.HELM_CHART_VERSION }}-${{ github.sha }} \
+            ${{ env.HELM_CHART_PATH }}
 
     - name: Authenticate with the registry
       run: |
@@ -102,7 +89,7 @@ jobs:
     - name: Push chart to registry as OCI artifact
       run: |
         helm push \
-        ${{ inputs.HELM_RELEASE_NAME }}-${{ inputs.HELM_CHART_VERSION }}.tgz \
+        ${{ env.HELM_RELEASE_NAME }}-${{ env.HELM_CHART_VERSION }}-${{ github.sha }}.tgz \
         oci://${{ secrets.ACR_URL }}/helm
 
     - name: Install / Upgrade helm chart
@@ -110,13 +97,28 @@ jobs:
         helm upgrade \
             --install \
             --create-namespace \
-            --namespace ${{ inputs.NAMESPACE }} \
+            --namespace ${{ env.NAMESPACE }} \
             --atomic \
             --wait \
-            ${{ inputs.HELM_RELEASE_NAME }} \
-            oci://${{ secrets.ACR_URL }}/helm/${{ inputs.HELM_RELEASE_NAME }} --version ${{ inputs.HELM_CHART_VERSION }} \
-            --set namespace=${{ inputs.NAMESPACE }} \
+            ${{ env.HELM_RELEASE_NAME }} \
+            oci://${{ secrets.ACR_URL }}/helm/${{ env.HELM_RELEASE_NAME }} --version ${{ env.HELM_CHART_VERSION }}-${{ github.sha }} \
+            --set namespace=${{ env.NAMESPACE }} \
             --set image.repository=${{ secrets.ACR_URL }} \
-            --set image.name=${{ inputs.IMAGE_NAME }} \
+            --set image.name=${{ env.IMAGE_NAME }} \
             --set image.tag=${{ github.sha }}
             ### "--SET" should be replaced with "-f values.yaml" format
+
+    # --- PreProd Tests ---
+
+    - name: "PreProd Test Steps"
+      run: echo "---- PreProd Tests ----"
+
+    # --- Validation&Approvement ---
+
+    - name: "PreProd Approvement Step"
+      run: echo "---- PreProd Approvement ----"
+
+    # --- Image Promotion ---
+
+    - name: "PreProd Image Promotion Step"
+      run: echo "---- PreProd Image Promotion ----"
