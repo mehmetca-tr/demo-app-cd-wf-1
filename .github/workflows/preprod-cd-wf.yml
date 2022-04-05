@@ -25,6 +25,14 @@ jobs:
     steps:
     - name: "Checkout repository"
       uses: actions/checkout@master
+
+    - name: Import environment variables from the configuration variables maps file
+      id: import-env
+      shell: bash
+      run: |
+        while read line; do
+          echo "$line" >> $GITHUB_ENV
+        done < ${{ env.ENV_FILE }}
     
     - uses: Azure/docker-login@v1
       with:
