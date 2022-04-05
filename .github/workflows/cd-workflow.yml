@@ -37,7 +37,7 @@ jobs:
       run: |
         while read line; do
           echo "$line" >> $GITHUB_ENV
-        done < main/${{ env.ENV_FILE }}
+        done < main/${{ inputs.ENV_FILE }}
     
     - name: Use the env var
       run: |
