@@ -1,0 +1,39 @@
+name: Check-Resource-Access
+
+on:
+  workflow_dispatch:
+
+env:
+  CLUSTER_NAME: contoso-video
+  RESOURCE_GROUP: mslearn-gh-pipelines-5163
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: Azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_URL }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: "Set the target AKS cluster"
+      uses: Azure/aks-set-context@v1
+      with:
+        creds: '${{ secrets.AZURE_CREDENTIALS }}'
+        cluster-name: ${{ env.CLUSTER_NAME }}
+        resource-group: ${{ env.RESOURCE_GROUP }}
+
+    ### HELM COMMANDS
+
+    - name: Install Helm
+      uses: Azure/setup-helm@v1
+      with:
+        version: v3.8.0
+
+    - name: Authenticate with the registry
+      run: |
+        helm registry login \
+            ${{ secrets.ACR_URL }} \
+            --username ${{ secrets.ACR_USERNAME }} \
+            --password ${{ secrets.ACR_PASSWORD }}
