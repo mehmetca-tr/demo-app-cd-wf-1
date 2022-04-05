@@ -1,0 +1,134 @@
+name: "Preprod-CD-Workflow"
+
+on:
+  # push:
+  #  branches:
+  #    - main
+
+  workflow_dispatch:  
+
+env:
+  CLUSTER_NAME: contoso-video
+  RESOURCE_GROUP: mslearn-gh-pipelines-5163
+  NAMESPACE: index-app-ns
+  IMAGE_NAME: index-app
+  HELM_RELEASE_NAME: index-app
+  HELM_CHART_PATH: ./helm-charts/index-app
+  APP_VERSION: 1.0.0-${{ github.sha }}
+  HELM_CHART_VERSION: 1.0-${{ github.sha }}
+  ENV_FILE: env-config-var.yml
+
+jobs:
+  # BASIC CI Workflow
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Checkout repository"
+      uses: actions/checkout@master
+    
+    - uses: Azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_URL }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    - name: "Build and push to container registry"
+      run: |
+        docker build . -t ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}
+        docker push ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}
+
+  # CD Workflow
+  deploy:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+    # - name: "Get code from github repo"
+    #   uses: actions/checkout@master
+
+# ----------------------
+
+    - name: "Checkout service repository"
+      uses: actions/checkout@v3
+      with:
+        path: main
+
+    - name: "Checkout services-helm-charts repository"
+      uses: actions/checkout@v3
+      with:
+        repository: mehmetca-tr/services-helm-charts
+        path: services-helm-charts
+
+    - name: Import environment variables from the configuration variables maps file
+      id: import-env
+      shell: bash
+      run: |
+        while read line; do
+          echo "$line" >> $GITHUB_ENV
+        done < ${{ env.ENV_FILE }}
+# ----------------------
+
+    - name: "Set the target AKS cluster"
+      uses: Azure/aks-set-context@v1
+      with:
+        creds: '${{ secrets.AZURE_CREDENTIALS }}'
+        cluster-name: ${{ env.CLUSTER_NAME }}
+        resource-group: ${{ env.RESOURCE_GROUP }}
+
+    ### HELM COMMANDS
+
+    - name: Install Helm
+      uses: Azure/setup-helm@v1
+      with:
+        version: v3.8.0
+
+    - name: Helm Dry Run
+      run: |
+        helm upgrade \
+            --dry-run \
+            --install \
+            --create-namespace \
+            --namespace ${{ env.NAMESPACE }} \
+            --atomic \
+            --wait \
+            ${{ env.HELM_RELEASE_NAME }} \
+            ${{ env.HELM_CHART_PATH }} \
+            --set namespace=${{ env.NAMESPACE }} \
+            --set image.repository=${{ secrets.ACR_URL }} \
+            --set image.name=${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ github.sha }} 
+
+    - name: Helm Package
+      run: |
+        helm package \
+            --dependency-update \
+            --app-version ${{ env.APP_VERSION }} \
+            --version ${{ env.HELM_CHART_VERSION }} \
+            ${{ env.HELM_CHART_PATH }}
+
+    - name: Authenticate with the registry
+      run: |
+        helm registry login \
+            ${{ secrets.ACR_URL }} \
+            --username ${{ secrets.ACR_USERNAME }} \
+            --password ${{ secrets.ACR_PASSWORD }}
+
+    - name: Push chart to registry as OCI artifact
+      run: |
+        helm push \
+        ${{ env.HELM_RELEASE_NAME }}-${{ env.HELM_CHART_VERSION }}.tgz \
+        oci://${{ secrets.ACR_URL }}/helm
+
+    - name: Install / Upgrade helm chart
+      run: |
+        helm upgrade \
+            --install \
+            --create-namespace \
+            --namespace ${{ env.NAMESPACE }} \
+            --atomic \
+            --wait \
+            ${{ env.HELM_RELEASE_NAME }} \
+            oci://${{ secrets.ACR_URL }}/helm/${{ env.HELM_RELEASE_NAME }} --version ${{ env.HELM_CHART_VERSION }} \
+            --set namespace=${{ env.NAMESPACE }} \
+            --set image.repository=${{ secrets.ACR_URL }} \
+            --set image.name=${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ github.sha }} 
