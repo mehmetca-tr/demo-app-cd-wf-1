@@ -44,8 +44,8 @@ jobs:
           echo "$line" >> $GITHUB_ENV
         done < main/${{ env.ENV_FILE }}
 
-  - name: Use the env var
-    id: step_two
-    run: |
-      echo "${{ env.DEMO }}"
+    - name: Use the env var
+      id: step_two
+      run: |
+        echo "${{ env.DEMO }}"
 # ----------------------
