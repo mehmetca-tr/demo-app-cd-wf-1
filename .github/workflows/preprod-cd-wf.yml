@@ -8,15 +8,15 @@ on:
   workflow_dispatch:  
 
 env:
-  CLUSTER_NAME: contoso-video
-  RESOURCE_GROUP: mslearn-gh-pipelines-5163
-  NAMESPACE: index-app-ns
-  IMAGE_NAME: index-app
-  HELM_RELEASE_NAME: index-app
-  HELM_CHART_PATH: ./helm-charts/index-app
-  APP_VERSION: 1.0.0-${{ github.sha }}
-  HELM_CHART_VERSION: 1.0-${{ github.sha }}
-  ENV_FILE: env-config-var.yml
+  # CLUSTER_NAME: contoso-video
+  # RESOURCE_GROUP: mslearn-gh-pipelines-5163
+  # NAMESPACE: index-app-ns
+  # IMAGE_NAME: index-app
+  # HELM_RELEASE_NAME: index-app
+  # HELM_CHART_PATH: ./helm-charts/index-app
+  # APP_VERSION: 1.0.0-${{ github.sha }}
+  # HELM_CHART_VERSION: 1.0-${{ github.sha }}
+  ENV_FILE: env-config-var.txt
 
 jobs:
   # BASIC CI Workflow
@@ -64,7 +64,7 @@ jobs:
       run: |
         while read line; do
           echo "$line" >> $GITHUB_ENV
-        done < ${{ env.ENV_FILE }}
+        done < main/${{ env.ENV_FILE }}
 # ----------------------
 
     - name: "Set the target AKS cluster"
@@ -101,8 +101,8 @@ jobs:
       run: |
         helm package \
             --dependency-update \
-            --app-version ${{ env.APP_VERSION }} \
-            --version ${{ env.HELM_CHART_VERSION }} \
+            --app-version ${{ env.APP_VERSION }}-${{ github.sha }} \
+            --version ${{ env.HELM_CHART_VERSION }}-${{ github.sha }} \
             ${{ env.HELM_CHART_PATH }}
 
     - name: Authenticate with the registry
@@ -115,7 +115,7 @@ jobs:
     - name: Push chart to registry as OCI artifact
       run: |
         helm push \
-        ${{ env.HELM_RELEASE_NAME }}-${{ env.HELM_CHART_VERSION }}.tgz \
+        ${{ env.HELM_RELEASE_NAME }}-${{ env.HELM_CHART_VERSION }}-${{ github.sha }}.tgz \
         oci://${{ secrets.ACR_URL }}/helm
 
     - name: Install / Upgrade helm chart
@@ -127,7 +127,7 @@ jobs:
             --atomic \
             --wait \
             ${{ env.HELM_RELEASE_NAME }} \
-            oci://${{ secrets.ACR_URL }}/helm/${{ env.HELM_RELEASE_NAME }} --version ${{ env.HELM_CHART_VERSION }} \
+            oci://${{ secrets.ACR_URL }}/helm/${{ env.HELM_RELEASE_NAME }} --version ${{ env.HELM_CHART_VERSION }}-${{ github.sha }} \
             --set namespace=${{ env.NAMESPACE }} \
             --set image.repository=${{ secrets.ACR_URL }} \
             --set image.name=${{ env.IMAGE_NAME }} \
