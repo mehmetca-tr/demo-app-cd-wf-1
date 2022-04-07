@@ -130,7 +130,7 @@ jobs:
       run: |
         echo "The test process has been completed..."
         echo "Approved..."
-        echo "Application image will be tagged with a < STABLE > tag and push to the ACR..."
+        echo "Deployed image will be tagged with a < STABLE > tag and push to the ACR..."
 
     # --- Image Promotion ---
   image-promotion:
@@ -139,6 +139,19 @@ jobs:
     steps:
     - name: "PreProd Image Promotion Step"
       run: echo "---- PreProd Image Promotion ----"
+
+    - name: "Checkout service repository"
+      uses: actions/checkout@v3
+      with:
+        path: main
+
+    - name: Import environment configuration variables maps file
+      id: import-env
+      shell: bash
+      run: |
+        while read line; do
+          echo "$line" >> $GITHUB_ENV
+        done < main/${{ inputs.ENV_FILE }}
 
     - uses: Azure/docker-login@v1
       with:
@@ -150,3 +163,4 @@ jobs:
       run: |
         docker tag ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }} ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}-stable
         docker push ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}-stable
+        echo "Pushed with a < STABLE > tag"
