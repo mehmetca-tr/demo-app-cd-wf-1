@@ -1,0 +1,14 @@
+name: test-approvement
+
+on:
+  workflow_dispatch:
+  
+jobs:
+  getapproval:
+    runs-on: ubuntu-latest
+    environment: 'preprod'
+    
+    steps:
+      - name: Get Approval 
+        run: |
+          echo Approved... 
