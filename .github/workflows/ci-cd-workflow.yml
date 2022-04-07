@@ -46,7 +46,7 @@ jobs:
 
   CD:
     needs: [build]
-    uses: mehmetca-tr/demo-app-cd-wf-1/.github/workflows/cd-workflow.yml@main
+    uses: mehmetca-tr/CI-CD-workflows/.github/workflows/cd-workflow.yml@main
     with:
       ENV_FILE: ${{ github.event.inputs.EnvFile }}
     secrets:
