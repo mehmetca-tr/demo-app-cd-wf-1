@@ -113,16 +113,37 @@ jobs:
             ### "--SET" should be replaced with "-f values.yaml" format
 
     # --- PreProd Tests ---
-
+  test:
+    runs-on: ubuntu-latest
+    steps:
     - name: "PreProd Test Steps"
       run: echo "---- PreProd Tests ----"
 
     # --- Validation&Approvement ---
-
-    - name: "PreProd Approvement Step"
-      run: echo "---- PreProd Approvement ----"
+  approvement:
+    runs-on: ubuntu-latest
+    environment: 'preprod'
+    steps:
+    - name: "PreProd Get Approvement"
+      run: |
+        echo "The test process has been completed..."
+        echo "Approved..."
+        echo "Application image will be tagged with a < STABLE > tag and push to the ACR..."
 
     # --- Image Promotion ---
-
+  image-promotion:
+    runs-on: ubuntu-latest
+    steps:
     - name: "PreProd Image Promotion Step"
       run: echo "---- PreProd Image Promotion ----"
+
+    - uses: Azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_URL }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    - name: "Tag and push to container registry"
+      run: |
+        docker tag ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }} ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}-stable
+        docker push ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}-stable
