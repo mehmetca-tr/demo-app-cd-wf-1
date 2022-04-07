@@ -161,6 +161,7 @@ jobs:
     
     - name: "Tag and push to container registry"
       run: |
+        docker pull ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}
         docker tag ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }} ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}-stable
         docker push ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}-stable
         echo "Pushed with a < STABLE > tag"
