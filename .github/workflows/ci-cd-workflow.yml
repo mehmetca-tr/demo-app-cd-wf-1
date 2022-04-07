@@ -43,7 +43,6 @@ jobs:
         docker build . -t ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}
         docker push ${{ secrets.ACR_URL }}/${{env.IMAGE_NAME}}:${{ github.sha }}
 
-
   CD:
     needs: [build]
     uses: mehmetca-tr/CI-CD-workflows/.github/workflows/cd-workflow.yml@main
